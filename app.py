@@ -8,12 +8,17 @@ import random
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-    client_id=st.secrets["SPOTIPY_CLIENT_ID"],
-    client_secret=st.secrets["SPOTIPY_CLIENT_SECRET"],
-    redirect_uri=st.secrets["SPOTIPY_REDIRECT_URI"],
-    scope=scope
-))
+try:
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        client_id=st.secrets["SPOTIPY_CLIENT_ID"],
+        client_secret=st.secrets["SPOTIPY_CLIENT_SECRET"],
+        redirect_uri=st.secrets["SPOTIPY_REDIRECT_URI"],
+        scope=scope
+    ))
+except Exception as e:
+    st.error("❌ Spotify authentication failed. Check your credentials in Streamlit Secrets.")
+    st.exception(e)
+    st.stop()
 
 
 st.title("🎵 Shotify 🎵")
