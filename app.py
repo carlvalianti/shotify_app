@@ -8,50 +8,49 @@ import random
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
-# try:
-#     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-#         client_id=st.secrets["SPOTIPY_CLIENT_ID"],
-#         client_secret=st.secrets["SPOTIPY_CLIENT_SECRET"],
-#         redirect_uri=st.secrets["SPOTIPY_REDIRECT_URI"],
-#         scope=scope
-#     ))
-# except Exception as e:
-#     st.error("❌ Spotify authentication failed. Check your credentials in Streamlit Secrets.")
-#     st.exception(e)
-#     st.stop()
+try:
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        client_id=st.secrets["SPOTIPY_CLIENT_ID"],
+        client_secret=st.secrets["SPOTIPY_CLIENT_SECRET"],
+        redirect_uri=st.secrets["SPOTIPY_REDIRECT_URI"],
+        scope=scope
+    ))
+except Exception as e:
+    st.error("❌ Spotify authentication failed. Check your credentials...")
+    st.exception(e)
+    st.stop()
 
 
 st.title("🎵 Shotify 🎵")
 
-st.write("✅ Cloud app rendered")
 # Try loading secrets first
-try:
-    client_id = st.secrets["SPOTIPY_CLIENT_ID"]
-    client_secret = st.secrets["SPOTIPY_CLIENT_SECRET"]
-    redirect_uri = st.secrets["SPOTIPY_REDIRECT_URI"]
-    st.success("✅ Secrets loaded")
-except Exception as e:
-    st.error("❌ Failed to load secrets.")
-    st.exception(e)
-    st.stop()
-
-# Try setting up Spotipy
-try:
-    scope = (
-        "user-library-read user-read-playback-state user-read-currently-playing "
-        "playlist-read-private user-modify-playback-state"
-    )
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-        client_id=client_id,
-        client_secret=client_secret,
-        redirect_uri=redirect_uri,
-        scope=scope
-    ))
-    st.success("✅ Spotify client initialized")
-except Exception as e:
-    st.error("❌ Spotify OAuth failed")
-    st.exception(e)
-    st.stop()
+# try:
+#     client_id = st.secrets["SPOTIPY_CLIENT_ID"]
+#     client_secret = st.secrets["SPOTIPY_CLIENT_SECRET"]
+#     redirect_uri = st.secrets["SPOTIPY_REDIRECT_URI"]
+#     st.success("✅ Secrets loaded")
+# except Exception as e:
+#     st.error("❌ Failed to load secrets.")
+#     st.exception(e)
+#     st.stop()
+#
+# # Try setting up Spotipy
+# try:
+#     scope = (
+#         "user-library-read user-read-playback-state user-read-currently-playing "
+#         "playlist-read-private user-modify-playback-state"
+#     )
+#     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+#         client_id=client_id,
+#         client_secret=client_secret,
+#         redirect_uri=redirect_uri,
+#         scope=scope
+#     ))
+#     st.success("✅ Spotify client initialized")
+# except Exception as e:
+#     st.error("❌ Spotify OAuth failed")
+#     st.exception(e)
+#     st.stop()
 
 # Get user devices and show as dropdown
 def get_devices():
@@ -102,5 +101,3 @@ if st.button("Start Powerhour"):
     playlist_name = selected_playlist[0]
     playlist_uri = selected_playlist[1]
     powerhour(playlist_uri, playlist_name, randomize, offset, device_id)
-
-st.write("✅ App made it to the bottom.")
