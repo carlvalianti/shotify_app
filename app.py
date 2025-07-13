@@ -8,19 +8,43 @@ import random
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
-try:
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-        client_id=st.secrets["SPOTIPY_CLIENT_ID"],
-        client_secret=st.secrets["SPOTIPY_CLIENT_SECRET"],
-        redirect_uri=st.secrets["SPOTIPY_REDIRECT_URI"],
-        scope=scope
-    ))
-except Exception as e:
-    st.error("❌ Spotify authentication failed. Check your credentials...")
-    st.exception(e)
-    st.stop()
+
+def authenticate_user():
+    # Use modern st.query_params instead of experimental_
+    url_params = st.query_params
+    code = url_params.get("code", [None])[0]
+
+    if not code:
+        auth_url = f"https://accounts.spotify.com/authorize?client_id={st.secrets['SPOTIPY_CLIENT_ID']}" \
+                   f"&response_type=code" \
+                   f"&redirect_uri={st.secrets['SPOTIPY_REDIRECT_URI']}" \
+                   f"&scope={scope}" \
+                   f"&show_dialog=True"
+        st.markdown(f"""
+            <a href="{auth_url}" style="background-color: #1DB954; color: white; padding: 10px 20px; 
+            text-align: center; text-decoration: none; display: inline-block; border-radius: 4px;">
+            Login with Spotify
+            </a>
+            """, unsafe_allow_html=True)
+        st.stop()
+    else:
+        auth_manager = SpotifyOAuth(
+            client_id=st.secrets['SPOTIPY_CLIENT_ID'],
+            client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
+            redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],
+            scope=scope,
+            cache_path=None
+        )
+        try:
+            return spotipy.Spotify(auth_manager=auth_manager)
+        except Exception as e:
+            st.error(f"Authentication failed: {str(e)}")
+            # Use modern st.query_params.clear() instead
+            st.query_params.clear()
+            st.rerun()
 
 st.title("🎵 Shotify 🎵")
+sp = authenticate_user()  # This will force login
 
 # Initialize session state
 if 'ph_running' not in st.session_state:
