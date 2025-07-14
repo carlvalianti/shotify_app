@@ -8,40 +8,63 @@ import random
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
+st.write(f"""
+**Auth Debug Info:**  
+- Client ID: `{st.secrets.get('SPOTIPY_CLIENT_ID', 'MISSING')}`  
+- Redirect URI: `{st.secrets.get('SPOTIPY_REDIRECT_URI', 'MISSING')}`  
+- SECRET ID: `{st.secrets.get('SPOTIPY_CLIENT_SECRET', 'MISSING')}`  
+- Scope: `{scope}`
+""")
 
 def authenticate_user():
-    # Use modern st.query_params instead of experimental_
-    url_params = st.query_params
-    code = url_params.get("code", [None])[0]
+    scope = ("user-library-read user-read-playback-state user-read-currently-playing "
+             "playlist-read-private user-modify-playback-state")
 
-    if not code:
-        auth_url = f"https://accounts.spotify.com/authorize?client_id={st.secrets['SPOTIPY_CLIENT_ID']}" \
-                   f"&response_type=code" \
-                   f"&redirect_uri={st.secrets['SPOTIPY_REDIRECT_URI']}" \
-                   f"&scope={scope}" \
-                   f"&show_dialog=True"
-        st.markdown(f"""
-            <a href="{auth_url}" style="background-color: #1DB954; color: white; padding: 10px 20px; 
-            text-align: center; text-decoration: none; display: inline-block; border-radius: 4px;">
-            Login with Spotify
-            </a>
-            """, unsafe_allow_html=True)
+    # Setup Spotify OAuth with a dedicated public cache file
+    auth_manager = SpotifyOAuth(
+        client_id=st.secrets['SPOTIPY_CLIENT_ID'],
+        client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
+        redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],
+        scope=scope,
+        cache_path=".cache-public",  # Will be created automatically
+        show_dialog=True
+    )
+
+    # Try to retrieve cached token or parse 'code' from URL
+    token_info = auth_manager.get_cached_token()
+
+    if not token_info:
+        url_params = st.query_params
+        code = url_params.get("code", [None])[0]
+
+        if not code:
+            # No token and no code = trigger login
+            auth_url = auth_manager.get_authorize_url()
+            st.markdown(f"""
+                <a href="{auth_url}" style="background-color: #1DB954; color: white; padding: 10px 20px;
+                text-align: center; text-decoration: none; display: inline-block; border-radius: 4px;">
+                Login with Spotify
+                </a>
+                """, unsafe_allow_html=True)
+            st.stop()
+        else:
+            try:
+                token_info = auth_manager.get_access_token(code, as_dict=True)
+                st.query_params.clear()
+            except Exception as e:
+                st.error(f"🚫 Spotify token exchange failed: {e}")
+                st.query_params.clear()
+                st.stop()
+
+    try:
+        return spotipy.Spotify(auth_manager=auth_manager)
+    except Exception as e:
+        st.error(f"❌ Final Spotify auth failed: {e}")
+        st.session_state.ph_running = False
+        st.session_state.ph_started = False
+        st.query_params.clear()
         st.stop()
-    else:
-        auth_manager = SpotifyOAuth(
-            client_id=st.secrets['SPOTIPY_CLIENT_ID'],
-            client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
-            redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],
-            scope=scope,
-            cache_path=None
-        )
-        try:
-            return spotipy.Spotify(auth_manager=auth_manager)
-        except Exception as e:
-            st.error(f"Authentication failed: {str(e)}")
-            # Use modern st.query_params.clear() instead
-            st.query_params.clear()
-            st.rerun()
+
 
 st.title("🎵 Shotify 🎵")
 sp = authenticate_user()  # This will force login
