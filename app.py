@@ -17,51 +17,44 @@ st.write(f"""
 """)
 
 def authenticate_user():
-    scope = ("user-library-read user-read-playback-state user-read-currently-playing "
-             "playlist-read-private user-modify-playback-state")
 
-    # Setup Spotify OAuth with a dedicated public cache file
+    # Create the auth manager with a cache file for public use
     auth_manager = SpotifyOAuth(
         client_id=st.secrets['SPOTIPY_CLIENT_ID'],
         client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
         redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],
         scope=scope,
-        cache_path=".cache-public",  # Will be created automatically
+        cache_path=".cache-public",
         show_dialog=True
     )
 
-    # Try to retrieve cached token or parse 'code' from URL
+    # Check for cached token first
     token_info = auth_manager.get_cached_token()
 
+    # If no cached token, check for code in query params
     if not token_info:
-        url_params = st.query_params
-        code = url_params.get("code", [None])[0]
+        code = st.query_params.get("code")
 
         if not code:
-            # No token and no code = trigger login
+            # No token and no code = show login button
             auth_url = auth_manager.get_authorize_url()
-            st.markdown(f"""
-                <a href="{auth_url}" style="background-color: #1DB954; color: white; padding: 10px 20px;
-                text-align: center; text-decoration: none; display: inline-block; border-radius: 4px;">
-                Login with Spotify
-                </a>
-                """, unsafe_allow_html=True)
+            st.link_button("🎧 Login with Spotify", auth_url)
             st.stop()
         else:
             try:
-                token_info = auth_manager.get_access_token(code, as_dict=True)
-                st.query_params.clear()
+                # Exchange the code for a token (let Spotipy manage format)
+                auth_manager.get_access_token(code)
+                st.query_params.clear()  # Clear URL params once used
             except Exception as e:
                 st.error(f"🚫 Spotify token exchange failed: {e}")
                 st.query_params.clear()
                 st.stop()
 
+    # Try using the token (either from cache or fresh)
     try:
         return spotipy.Spotify(auth_manager=auth_manager)
     except Exception as e:
         st.error(f"❌ Final Spotify auth failed: {e}")
-        st.session_state.ph_running = False
-        st.session_state.ph_started = False
         st.query_params.clear()
         st.stop()
 
