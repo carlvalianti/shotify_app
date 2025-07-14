@@ -8,14 +8,6 @@ import random
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
-st.write(f"""
-**Auth Debug Info:**  
-- Client ID: `{st.secrets.get('SPOTIPY_CLIENT_ID', 'MISSING')}`  
-- Redirect URI: `{st.secrets.get('SPOTIPY_REDIRECT_URI', 'MISSING')}`  
-- SECRET ID: `{st.secrets.get('SPOTIPY_CLIENT_SECRET', 'MISSING')}`  
-- Scope: `{scope}`
-""")
-
 def authenticate_user():
 
     # Create the auth manager with a cache file for public use
