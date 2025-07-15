@@ -8,6 +8,20 @@ from streamlit_lottie import st_lottie
 # globals
 SECONDS = 10
 
+# top padding
+st.markdown(
+    """
+    <style>
+        /* Reduce top padding */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # Set up Spotify credentials and scope
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
@@ -55,7 +69,7 @@ def authenticate_user():
         st.stop()
 
 
-st.title("🎵 Shotify 🎵")
+st.markdown("<h1 style='text-align: center;'>🎵 Shotify 🎵</h1>", unsafe_allow_html=True)
 sp = authenticate_user()  # This will force login
 
 # Initialize session state
@@ -86,6 +100,7 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
     # Create placeholders for dynamic info display and progress bar
     info_placeholder = st.empty()
     progress_bar = st.progress(0)
+    animation_key = 0
 
     if chosen_random:
         random.shuffle(track_list)
@@ -109,8 +124,11 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
 
 
         # Show track info and progress bar for current song
+        display_track = (track_name[:37] + "...") if len(track_name) > 40 else track_name
+        display_artist = (artist_name[:22] + "...") if len(artist_name) > 25 else artist_name
+
         info_placeholder.markdown(
-            f"{'[LAST TRACK] ' if is_last else ''}🎵 Now playing: **{track_name}** by **{artist_name}** ({i + 1}/{len(track_list)})"
+            f"{'[LAST TRACK] ' if is_last else ''}🎵 Now playing: **{display_track}** by **{display_artist}** ({i + 1}/{len(track_list)})"
         )
         progress_bar.progress(0)
 
@@ -123,9 +141,10 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
 
         # animation shown once per track
         animation_container = st.empty()
-        with animation_container:
-            st_lottie(beer_animation, height=200, key=f"beer_animation_{i}")
-        time.sleep(5)
+        animation_key += 1
+
+
+
         animation_container.empty()  # hide animation after 3 seconds
 
         if not is_last:
@@ -136,6 +155,15 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
 
                 time.sleep(1)
                 playback = sp.current_playback()
+
+                # show animation for only 5 seconds
+                if second < 5:
+                    animation_key += 1
+                    with animation_container:
+                        st_lottie(beer_animation, height=200, key=f"beer_animation_{animation_key}")
+                else:
+                    animation_container.empty()
+
 
                 # Update progress bar
                 progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1
@@ -171,12 +199,13 @@ selected_playlist = st.selectbox(
 randomize = st.checkbox("Shuffle track order?", value=False)
 offset = st.checkbox("Start each track at 30 seconds?", value=False)
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns(2, gap="small")
 with col1:
     if st.button(
             "Start Powerhour",
             disabled=st.session_state.ph_running or st.session_state.ph_started,
-            key="start_btn"
+            key="start_btn",
+            use_container_width=True
     ):
         st.session_state.ph_running = True
         st.session_state.ph_started = True
@@ -186,7 +215,8 @@ with col2:
     if st.button(
             "Stop Powerhour",
             disabled=not st.session_state.ph_running,
-            key="stop_btn"
+            key="stop_btn",
+            use_container_width=True
     ):
         st.session_state.ph_running = False  #maybe move this inside if statement?
         st.warning("Stopping after current track...")
@@ -198,3 +228,7 @@ if st.session_state.ph_started and st.session_state.ph_running:
     playlist_name = selected_playlist[0]
     playlist_uri = selected_playlist[1]
     powerhour(playlist_uri, playlist_name, randomize, offset, device_id)
+
+
+    #todo 3 -
+    #todo 4 - beer animation is pausing the entire program.  maybe progress or some other solution?
