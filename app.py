@@ -8,26 +8,27 @@ from streamlit_lottie import st_lottie
 # globals for testing
 SECONDS = 10
 
-# top padding
+# top/bottom padding
 st.markdown(
     """
     <style>
         /* Reduce top padding */
         .block-container {
             padding-top: 2rem !important;
+            padding-bottom: 1rem !important;
         }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# Set up Spotify credentials and scope
+# set up Spotify credentials and scope
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
 def authenticate_user():
 
-    # Create the auth manager with a cache file for public use
+    # create the auth manager with a cache file for public use
     auth_manager = SpotifyOAuth(
         client_id=st.secrets['SPOTIPY_CLIENT_ID'],
         client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
@@ -37,10 +38,10 @@ def authenticate_user():
         show_dialog=True
     )
 
-    # Check for cached token first
+    # check for cached token first
     token_info = auth_manager.get_cached_token()
 
-    # If no cached token, check for code in query params
+    # ff no cached token, check for code in query params
     if not token_info:
         code = st.query_params.get("code")
 
@@ -51,7 +52,7 @@ def authenticate_user():
             st.stop()
         else:
             try:
-                # Exchange the code for a token (let Spotipy manage format)
+                # exchange the code for a token (let Spotipy manage format)
                 auth_manager.get_access_token(code)
                 st.query_params.clear()  # Clear URL params once used
             except Exception as e:
@@ -59,7 +60,7 @@ def authenticate_user():
                 st.query_params.clear()
                 st.stop()
 
-    # Try using the token (either from cache or fresh)
+    # try using the token (either from cache or fresh)
     try:
         return spotipy.Spotify(auth_manager=auth_manager)
     except Exception as e:
@@ -69,24 +70,23 @@ def authenticate_user():
 
 
 st.markdown("<h1 style='text-align: center;'>🎵 Shotify 🎵</h1>", unsafe_allow_html=True)
-sp = authenticate_user()  # This will force login
+sp = authenticate_user()  # this will force login
 
-# Initialize session state
+# initialize session state
 if 'ph_running' not in st.session_state:
     st.session_state.ph_running = False
 if 'ph_started' not in st.session_state:
     st.session_state.ph_started = False
 
 
-# Get user devices and playlists
+# get user devices and playlists
 def get_devices():
     return [(d["name"], d["id"]) for d in sp.devices()["devices"]]
-
 
 def get_playlists():
     return [(p["name"], p["uri"]) for p in sp.current_user_playlists(limit=25)["items"]]
 
-# Function to load Lottie animation
+# load Lottie animation
 def load_lottie_file(filepath):
     import json
     with open(filepath, "r") as f:
@@ -96,41 +96,51 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
     playlist = sp.playlist(playlist_id=chosen_uri, additional_types=('track',))
     track_list = list(range(len(playlist['tracks']['items'])))
 
-    # Create placeholders for dynamic info display and progress bar
+    # create placeholders for dynamic info display and progress bar
     info_placeholder = st.empty()
     progress_bar = st.progress(0)
-    animation_key = 0
 
+    animation_key = 0 # to create unique animations with Lottie requires
+
+    # shuffle track if random is checked
     if chosen_random:
         random.shuffle(track_list)
 
+    # create 30s offset if offset is checked
     offset = 30000 if chosen_offset else 0
     last_idx = len(track_list) - 1
 
     # load beer animation
     beer_animation = load_lottie_file("assets/clinking-beer-mugs.json")
 
+    # main loop through playlist, regardless of size
     for i, track_idx in enumerate(track_list):
         if not st.session_state.ph_running:
             st.warning("Powerhour stopped")
             return
 
+        # set flag for last song in playlist
         is_last = (i == last_idx)
-        # Get the current track's title
+
+        # get the current track's title, name, and artist name
         track_info = playlist['tracks']['items'][track_idx]['track']
         track_name = track_info['name']
         artist_name = track_info['artists'][0]['name']
 
 
-        # Show track info and progress bar for current song
+        # show track info and progress bar for current song
         display_track = (track_name[:37] + "...") if len(track_name) > 40 else track_name
         display_artist = (artist_name[:22] + "...") if len(artist_name) > 25 else artist_name
 
+        # info panel for the progress/current song
         info_placeholder.markdown(
             f"{'[LAST TRACK] ' if is_last else ''}🎵 Now playing: **{display_track}** by **{display_artist}** ({i + 1}/{len(track_list)})"
         )
+
+        # set progress bar to empty at the start of each track
         progress_bar.progress(0)
 
+        # playback instructions to include device, chosen uri, and offset
         sp.start_playback(
             device_id=chosen_device_id,
             context_uri=chosen_uri,
@@ -141,22 +151,22 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
         # animation shown once per track
         animation_container = st.empty()
         animation_key += 1
-        #animation_key_counter = 0
 
-        # show animation for only 5 seconds
+        # this makes the animation key unique for every track
         animation_key += 1
 
        # start animation outside of playback loop so only 1 instance shows up (avoids 1 showing every second)
         with animation_container:
             st_lottie(beer_animation, height=100, key=f"beer_animation_{animation_key}")
 
+        # playback loop is the same until the last song
         if not is_last:
             for second in range(SECONDS):  # change to 60 for actual use
                 if not st.session_state.ph_running:
                     st.warning("Powerhour stopped")
                     return
 
-                # I don't remember why I put this sleep here [look into this]
+                # sleep for 1 second increments to catch any user/device side pauses
                 time.sleep(1)
                 playback = sp.current_playback()
 
@@ -164,28 +174,30 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
                 if second > 4:
                     animation_container.empty()
 
-                # Update progress bar
+                # update progress bar as track plays
                 progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1
 
-                # If playback paused from device, wait until resumed
+                # ff playback paused from device, wait until resumed
                 if playback and not playback['is_playing']:
                     while not sp.current_playback()['is_playing']:
                         if not st.session_state.ph_running:
                             st.warning("Powerhour stopped")
                             return
-                        time.sleep(0.1)
+                        time.sleep(0.1) # check rapidly for unpause
 
-    # Final celebratory message after last track
+    # final celebratory message after last track
     info_placeholder.markdown(
-        "<h3 style='text-align: center;'>🎉 Powerhour Complete! Great job! 🎉</h3>",
+        "<h5 style='text-align: center;'>🎉 Powerhour Complete! Great job! 🎉</h5>",
         unsafe_allow_html=True
     )
+
+    # celebratory balloons
     st.balloons()
 
     # Pause to let users enjoy the moment
     time.sleep(15)
 
-    # Reset state and rerun
+    # reset state and rerun
     st.session_state.ph_running = False
     st.session_state.ph_started = False
     st.rerun()
@@ -209,6 +221,7 @@ selected_playlist = st.selectbox(
 randomize = st.checkbox("Shuffle track order?", value=False)
 offset = st.checkbox("Start each track at 30 seconds?", value=False)
 
+# setup and structure for play and stop buttons
 col1, col2 = st.columns(2, gap="small")
 with col1:
     if st.button(
@@ -232,7 +245,7 @@ with col2:
         st.warning("Stopping after current track...")
         st.rerun()
 
-# Run powerhour if started
+# run powerhour if started
 if st.session_state.ph_started and st.session_state.ph_running:
     device_id = selected_device[1]
     playlist_name = selected_playlist[0]
@@ -242,3 +255,4 @@ if st.session_state.ph_started and st.session_state.ph_running:
 
     #todo 5 - skip local songs if they aren't downloaded, currently locally available songs will play fine, but if the device doesn't have them the app kinda breaks
     #todo 6 - look into playing while phone is locked or browser isn't the active app.  the app might be running for an hour, so the screen might turn off
+    #todo 7 - gracefully exit if the device becomes unavailable, like the user closed the spotify desktop app or something
