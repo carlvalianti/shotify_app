@@ -5,7 +5,7 @@ import time
 import random
 from streamlit_lottie import st_lottie
 
-# globals
+# globals for testing
 SECONDS = 10
 
 # top padding
@@ -20,7 +20,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 
 # Set up Spotify credentials and scope
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
@@ -142,10 +141,14 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
         # animation shown once per track
         animation_container = st.empty()
         animation_key += 1
+        #animation_key_counter = 0
 
+        # show animation for only 5 seconds
+        animation_key += 1
 
-
-        animation_container.empty()  # hide animation after 3 seconds
+       # start animation outside of playback loop so only 1 instance shows up (avoids 1 showing every second)
+        with animation_container:
+            st_lottie(beer_animation, height=100, key=f"beer_animation_{animation_key}")
 
         if not is_last:
             for second in range(SECONDS):  # change to 60 for actual use
@@ -153,17 +156,13 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
                     st.warning("Powerhour stopped")
                     return
 
+                # I don't remember why I put this sleep here [look into this]
                 time.sleep(1)
                 playback = sp.current_playback()
 
-                # show animation for only 5 seconds
-                if second < 5:
-                    animation_key += 1
-                    with animation_container:
-                        st_lottie(beer_animation, height=200, key=f"beer_animation_{animation_key}")
-                else:
+                # stop animation after 5 seconds and then wait for the song to change
+                if second > 4:
                     animation_container.empty()
-
 
                 # Update progress bar
                 progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1
@@ -176,6 +175,17 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
                             return
                         time.sleep(0.1)
 
+    # Final celebratory message after last track
+    info_placeholder.markdown(
+        "<h3 style='text-align: center;'>🎉 Powerhour Complete! Great job! 🎉</h3>",
+        unsafe_allow_html=True
+    )
+    st.balloons()
+
+    # Pause to let users enjoy the moment
+    time.sleep(15)
+
+    # Reset state and rerun
     st.session_state.ph_running = False
     st.session_state.ph_started = False
     st.rerun()
@@ -230,5 +240,5 @@ if st.session_state.ph_started and st.session_state.ph_running:
     powerhour(playlist_uri, playlist_name, randomize, offset, device_id)
 
 
-    #todo 3 -
-    #todo 4 - beer animation is pausing the entire program.  maybe progress or some other solution?
+    #todo 5 - skip local songs if they aren't downloaded, currently locally available songs will play fine, but if the device doesn't have them the app kinda breaks
+    #todo 6 - look into playing while phone is locked or browser isn't the active app.  the app might be running for an hour, so the screen might turn off
