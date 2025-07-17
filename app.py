@@ -23,20 +23,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+if not st.session_state.get('ph_started', False):
+    with st.expander("ℹ️ Known issues & limitations"):
+        st.write("""
+        - Local songs will not play on devices that don’t have them downloaded.
+        - Tracks might appear playable but fail due to regional restrictions or removed content.
+        - Playback errors will attempt to skip the track automatically, but fails often
+        - Due to Spotify API limits, device detection and playback control may vary by user device.
+        """)
+
 # set up Spotify credentials and scope
 scope = ("user-library-read user-read-playback-state user-read-currently-playing "
          "playlist-read-private user-modify-playback-state")
 
+
 def authenticate_user():
 
-    # ⚠️ Fallback to 'public' if user_id not yet fetched
+    # ⚠️ Use 'public' as fallback before login
     user_id = st.session_state.get("user_id", "public")
 
-    # 🔐 Optional: Hash the user ID to obscure it in filenames
+    # 🔐 Hash user ID for cache filename privacy
     hashed_id = hashlib.sha256(user_id.encode()).hexdigest()
     user_cache = f".cache-{hashed_id}"
 
-    # 🎯 Create the auth manager with per-user cache file
+    # 🎯 Create auth manager with per-user cache file
     auth_manager = SpotifyOAuth(
         client_id=st.secrets['SPOTIPY_CLIENT_ID'],
         client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
@@ -46,29 +56,30 @@ def authenticate_user():
         show_dialog=True
     )
 
-    # 🧠 Try to load a cached token first
+    # 🧠 Try to get cached token for this user
     token_info = auth_manager.get_cached_token()
 
     if not token_info:
-        # 🔍 Check for auth code in URL query params
+        # 🔍 Check for Spotify auth code in URL query params
         code = st.query_params.get("code")
 
         if not code:
-            # 🚪 No code or token = show login button
+            # 🚪 No cached token or code, prompt login
             auth_url = auth_manager.get_authorize_url()
             st.link_button("🎧 Login with Spotify", auth_url)
             st.stop()
         else:
             try:
-                # 🔁 Exchange the code for a token
+                # 🔁 Exchange code for token (automatically cached)
                 auth_manager.get_access_token(code)
                 st.query_params.clear()
 
-                # 👤 Fetch and store the user ID in session_state
-                user_profile = spotipy.Spotify(auth_manager=auth_manager).current_user()
+                # 👤 Fetch logged-in user's Spotify ID
+                sp_temp = spotipy.Spotify(auth_manager=auth_manager)
+                user_profile = sp_temp.current_user()
                 st.session_state.user_id = user_profile["id"]
 
-                # 💾 Update user_cache with real user ID after auth
+                # 💾 Recalculate and store hashed cache file path for this user
                 hashed_id = hashlib.sha256(user_profile["id"].encode()).hexdigest()
                 st.session_state.user_cache = f".cache-{hashed_id}"
 
@@ -77,7 +88,7 @@ def authenticate_user():
                 st.query_params.clear()
                 st.stop()
 
-    # 🎵 Return authenticated Spotify client
+    # 🎵 Return authenticated Spotify client instance
     try:
         return spotipy.Spotify(auth_manager=auth_manager)
     except Exception as e:
@@ -194,7 +205,7 @@ def powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_
                 # update progress bar as track plays
                 progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1
 
-                # ff playback paused from device, wait until resumed
+                # if playback paused from device, wait until resumed
                 if playback and not playback['is_playing']:
                     while not sp.current_playback()['is_playing']:
                         if not st.session_state.ph_running:

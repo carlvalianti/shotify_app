@@ -1,0 +1,13 @@
+Index: .cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>{\"access_token\": \"BQCYe_Zv75K3lUeaJlYa6PDZzOY0QfcLjSe8X0Dt8va2CzCvGGUwoUlT043f9p5dEprLqYCNQO8nkzSrT3_1WpKFpFtKT1b2oIbEjpkvF2zpUt-uAvBhWPxJaNxcnNYzOJb7DuxZ03sr0cjnkfW7VsLRzaUiUlWProrE7gKEBL6chgO21sv940lXgRtK7xx86qrPkpFQIsd6EWFcemfhBjcn6kqrAqjztpObmByMZKXJ_xp_7PTvliSM\", \"token_type\": \"Bearer\", \"expires_in\": 3600, \"refresh_token\": \"AQDjAP6Mh-8vrjowMAwjfTv0BBMxPG9dsMAX1ghxwDR31Q9yQMaNDAoIhgJs6iwmkp13t0pW1ueSuRJeMpkUf_51TT6deBRzoniPuV-mprEZjiEX90OANnsMA2YD6mWZ20o\", \"scope\": \"user-library-read user-read-playback-state user-read-currently-playing playlist-read-private user-modify-playback-state\", \"expires_at\": 1752716799}
+===================================================================
+diff --git a/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7 b/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7
+--- a/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7	(revision 998f5bf2b2e79de8d60abfb69addda02aca0c83f)
++++ b/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7	(date 1752722555060)
+@@ -1,1 +1,1 @@
+-{"access_token": "BQCYe_Zv75K3lUeaJlYa6PDZzOY0QfcLjSe8X0Dt8va2CzCvGGUwoUlT043f9p5dEprLqYCNQO8nkzSrT3_1WpKFpFtKT1b2oIbEjpkvF2zpUt-uAvBhWPxJaNxcnNYzOJb7DuxZ03sr0cjnkfW7VsLRzaUiUlWProrE7gKEBL6chgO21sv940lXgRtK7xx86qrPkpFQIsd6EWFcemfhBjcn6kqrAqjztpObmByMZKXJ_xp_7PTvliSM", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "AQDjAP6Mh-8vrjowMAwjfTv0BBMxPG9dsMAX1ghxwDR31Q9yQMaNDAoIhgJs6iwmkp13t0pW1ueSuRJeMpkUf_51TT6deBRzoniPuV-mprEZjiEX90OANnsMA2YD6mWZ20o", "scope": "user-library-read user-read-playback-state user-read-currently-playing playlist-read-private user-modify-playback-state", "expires_at": 1752716799}
+\ No newline at end of file
++{"access_token": "BQD1CpXkzbgvwzD4tMGldoVQlhqwX8wsKXyygZYFgh2L3NkPBWnrpYX13iIjgQEkbGMB01FSZRg3p91J0ZQCXW1AZPYXeohSyfV1IpoRFCawU6lfVZ70AJ06_94hUIXHkkcKTEXfaubgkhBvHrfVzsLCiK95_HJmpmQKEafde5p_sy_YmIXM6AhwSaourlaQq6hSdw33O000Pda_6TAu3kxSk7fzq9ITbjhL3WYOLWXINC1tidjeU-_I", "token_type": "Bearer", "expires_in": 3600, "scope": "user-library-read user-read-playback-state user-read-currently-playing playlist-read-private user-modify-playback-state", "expires_at": 1752726155, "refresh_token": "AQDjAP6Mh-8vrjowMAwjfTv0BBMxPG9dsMAX1ghxwDR31Q9yQMaNDAoIhgJs6iwmkp13t0pW1ueSuRJeMpkUf_51TT6deBRzoniPuV-mprEZjiEX90OANnsMA2YD6mWZ20o"}
+\ No newline at end of file

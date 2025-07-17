@@ -1,0 +1,154 @@
+Index: app.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import hashlib\r\nimport streamlit as st\r\nimport spotipy\r\nfrom spotipy.oauth2 import SpotifyOAuth\r\nimport time\r\nimport random\r\nfrom streamlit_lottie import st_lottie\r\n\r\n# globals for testing\r\nSECONDS = 10\r\n\r\n# top/bottom padding\r\nst.markdown(\r\n    \"\"\"\r\n    <style>\r\n        /* Reduce top padding */\r\n        .block-container {\r\n            padding-top: 2rem !important;\r\n            padding-bottom: 1rem !important;\r\n        }\r\n    </style>\r\n    \"\"\",\r\n    unsafe_allow_html=True\r\n)\r\n\r\n# set up Spotify credentials and scope\r\nscope = (\"user-library-read user-read-playback-state user-read-currently-playing \"\r\n         \"playlist-read-private user-modify-playback-state\")\r\n\r\ndef authenticate_user():\r\n\r\n    # ⚠\uFE0F Fallback to 'public' if user_id not yet fetched\r\n    user_id = st.session_state.get(\"user_id\", \"public\")\r\n\r\n    # \uD83D\uDD10 Optional: Hash the user ID to obscure it in filenames\r\n    hashed_id = hashlib.sha256(user_id.encode()).hexdigest()\r\n    user_cache = f\".cache-{hashed_id}\"\r\n\r\n    # \uD83C\uDFAF Create the auth manager with per-user cache file\r\n    auth_manager = SpotifyOAuth(\r\n        client_id=st.secrets['SPOTIPY_CLIENT_ID'],\r\n        client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],\r\n        redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],\r\n        scope=scope,\r\n        cache_path=user_cache,\r\n        show_dialog=True\r\n    )\r\n\r\n    # \uD83E\uDDE0 Try to load a cached token first\r\n    token_info = auth_manager.get_cached_token()\r\n\r\n    if not token_info:\r\n        # \uD83D\uDD0D Check for auth code in URL query params\r\n        code = st.query_params.get(\"code\")\r\n\r\n        if not code:\r\n            # \uD83D\uDEAA No code or token = show login button\r\n            auth_url = auth_manager.get_authorize_url()\r\n            st.link_button(\"\uD83C\uDFA7 Login with Spotify\", auth_url)\r\n            st.stop()\r\n        else:\r\n            try:\r\n                # \uD83D\uDD01 Exchange the code for a token\r\n                auth_manager.get_access_token(code)\r\n                st.query_params.clear()\r\n\r\n                # \uD83D\uDC64 Fetch and store the user ID in session_state\r\n                user_profile = spotipy.Spotify(auth_manager=auth_manager).current_user()\r\n                st.session_state.user_id = user_profile[\"id\"]\r\n\r\n                # \uD83D\uDCBE Update user_cache with real user ID after auth\r\n                hashed_id = hashlib.sha256(user_profile[\"id\"].encode()).hexdigest()\r\n                st.session_state.user_cache = f\".cache-{hashed_id}\"\r\n\r\n            except Exception as e:\r\n                st.error(f\"\uD83D\uDEAB Spotify token exchange failed: {e}\")\r\n                st.query_params.clear()\r\n                st.stop()\r\n\r\n    # \uD83C\uDFB5 Return authenticated Spotify client\r\n    try:\r\n        return spotipy.Spotify(auth_manager=auth_manager)\r\n    except Exception as e:\r\n        st.error(f\"❌ Final Spotify auth failed: {e}\")\r\n        st.query_params.clear()\r\n        st.stop()\r\n\r\n\r\nst.markdown(\"<h1 style='text-align: center;'>\uD83C\uDFB5 Shotify \uD83C\uDFB5</h1>\", unsafe_allow_html=True)\r\nsp = authenticate_user()  # this will force login\r\n\r\n# initialize session state\r\nif 'ph_running' not in st.session_state:\r\n    st.session_state.ph_running = False\r\nif 'ph_started' not in st.session_state:\r\n    st.session_state.ph_started = False\r\n\r\n\r\n# get user devices and playlists\r\ndef get_devices():\r\n    return [(d[\"name\"], d[\"id\"]) for d in sp.devices()[\"devices\"]]\r\n\r\ndef get_playlists():\r\n    return [(p[\"name\"], p[\"uri\"]) for p in sp.current_user_playlists(limit=25)[\"items\"]]\r\n\r\n# load Lottie animation\r\ndef load_lottie_file(filepath):\r\n    import json\r\n    with open(filepath, \"r\") as f:\r\n        return json.load(f)\r\n\r\ndef powerhour(chosen_uri, chosen_playlist, chosen_random, chosen_offset, chosen_device_id):\r\n    playlist = sp.playlist(playlist_id=chosen_uri, additional_types=('track',))\r\n    track_list = list(range(len(playlist['tracks']['items'])))\r\n\r\n    # create placeholders for dynamic info display and progress bar\r\n    info_placeholder = st.empty()\r\n    progress_bar = st.progress(0)\r\n\r\n    animation_key = 0 # to create unique animations with Lottie requires\r\n\r\n    # shuffle track if random is checked\r\n    if chosen_random:\r\n        random.shuffle(track_list)\r\n\r\n    # create 30s offset if offset is checked\r\n    offset = 30000 if chosen_offset else 0\r\n    last_idx = len(track_list) - 1\r\n\r\n    # load beer animation\r\n    beer_animation = load_lottie_file(\"assets/clinking-beer-mugs.json\")\r\n\r\n    # main loop through playlist, regardless of size\r\n    for i, track_idx in enumerate(track_list):\r\n        if not st.session_state.ph_running:\r\n            st.warning(\"Powerhour stopped\")\r\n            return\r\n\r\n        # set flag for last song in playlist\r\n        is_last = (i == last_idx)\r\n\r\n        # get the current track's title, name, and artist name\r\n        track_info = playlist['tracks']['items'][track_idx]['track']\r\n        track_name = track_info['name']\r\n        artist_name = track_info['artists'][0]['name']\r\n\r\n\r\n        # show track info and progress bar for current song\r\n        display_track = (track_name[:37] + \"...\") if len(track_name) > 40 else track_name\r\n        display_artist = (artist_name[:22] + \"...\") if len(artist_name) > 25 else artist_name\r\n\r\n        # info panel for the progress/current song\r\n        info_placeholder.markdown(\r\n            f\"{'[LAST TRACK] ' if is_last else ''}\uD83C\uDFB5 Now playing: **{display_track}** by **{display_artist}** ({i + 1}/{len(track_list)})\"\r\n        )\r\n\r\n        # set progress bar to empty at the start of each track\r\n        progress_bar.progress(0)\r\n\r\n        # playback instructions to include device, chosen uri, and offset\r\n        sp.start_playback(\r\n            device_id=chosen_device_id,\r\n            context_uri=chosen_uri,\r\n            offset={\"position\": track_idx},\r\n            position_ms=0 if is_last else offset\r\n        )\r\n\r\n        # animation shown once per track\r\n        animation_container = st.empty()\r\n        animation_key += 1\r\n\r\n        # this makes the animation key unique for every track\r\n        animation_key += 1\r\n\r\n       # start animation outside of playback loop so only 1 instance shows up (avoids 1 showing every second)\r\n        with animation_container:\r\n            st_lottie(beer_animation, height=100, key=f\"beer_animation_{animation_key}\")\r\n\r\n        # playback loop is the same until the last song\r\n        if not is_last:\r\n            for second in range(SECONDS):  # change to 60 for actual use\r\n                if not st.session_state.ph_running:\r\n                    st.warning(\"Powerhour stopped\")\r\n                    return\r\n\r\n                # sleep for 1 second increments to catch any user/device side pauses\r\n                time.sleep(1)\r\n                playback = sp.current_playback()\r\n\r\n                # stop animation after 5 seconds and then wait for the song to change\r\n                if second > 4:\r\n                    animation_container.empty()\r\n\r\n                # update progress bar as track plays\r\n                progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1\r\n\r\n                # ff playback paused from device, wait until resumed\r\n                if playback and not playback['is_playing']:\r\n                    while not sp.current_playback()['is_playing']:\r\n                        if not st.session_state.ph_running:\r\n                            st.warning(\"Powerhour stopped\")\r\n                            return\r\n                        time.sleep(0.1) # check rapidly for unpause\r\n\r\n    # final celebratory message after last track\r\n    info_placeholder.markdown(\r\n        \"<h5 style='text-align: center;'>\uD83C\uDF89 Powerhour Complete! Great job! \uD83C\uDF89</h5>\",\r\n        unsafe_allow_html=True\r\n    )\r\n\r\n    # celebratory balloons\r\n    st.balloons()\r\n\r\n    # Pause to let users enjoy the moment\r\n    time.sleep(15)\r\n\r\n    # reset state and rerun\r\n    st.session_state.ph_running = False\r\n    st.session_state.ph_started = False\r\n    st.rerun()\r\n\r\n\r\n# UI Elements\r\ndevices_list = get_devices()\r\nselected_device = st.selectbox(\r\n    \"Select a device (if not shown, open Spotify on device and refresh):\",\r\n    devices_list,\r\n    format_func=lambda x: x[0]\r\n)\r\n\r\nplaylists_list = get_playlists()\r\nselected_playlist = st.selectbox(\r\n    \"Select a playlist:\",\r\n    playlists_list,\r\n    format_func=lambda x: x[0]\r\n)\r\n\r\nrandomize = st.checkbox(\"Shuffle track order?\", value=False)\r\noffset = st.checkbox(\"Start each track at 30 seconds?\", value=False)\r\n\r\n# setup and structure for play and stop buttons\r\ncol1, col2 = st.columns(2, gap=\"small\")\r\nwith col1:\r\n    if st.button(\r\n            \"Start Powerhour\",\r\n            disabled=st.session_state.ph_running or st.session_state.ph_started,\r\n            key=\"start_btn\",\r\n            use_container_width=True\r\n    ):\r\n        st.session_state.ph_running = True\r\n        st.session_state.ph_started = True\r\n        st.rerun()\r\n\r\nwith col2:\r\n    if st.button(\r\n            \"Stop Powerhour\",\r\n            disabled=not st.session_state.ph_running,\r\n            key=\"stop_btn\",\r\n            use_container_width=True\r\n    ):\r\n        st.session_state.ph_running = False  #maybe move this inside if statement?\r\n        st.warning(\"Stopping after current track...\")\r\n        st.rerun()\r\n\r\n# run powerhour if started\r\nif st.session_state.ph_started and st.session_state.ph_running:\r\n    device_id = selected_device[1]\r\n    playlist_name = selected_playlist[0]\r\n    playlist_uri = selected_playlist[1]\r\n    powerhour(playlist_uri, playlist_name, randomize, offset, device_id)\r\n\r\n\r\n    #todo 5 - skip local songs if they aren't downloaded, currently locally available songs will play fine, but if the device doesn't have them the app kinda breaks\r\n    #todo 6 - look into playing while phone is locked or browser isn't the active app.  the app might be running for an hour, so the screen might turn off\r\n    #todo 7 - gracefully exit if the device becomes unavailable, like the user closed the spotify desktop app or something
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app.py b/app.py
+--- a/app.py	(revision 998f5bf2b2e79de8d60abfb69addda02aca0c83f)
++++ b/app.py	(date 1752723693541)
+@@ -23,20 +23,30 @@
+     unsafe_allow_html=True
+ )
+ 
++if not st.session_state.get('ph_started', False):
++    with st.expander("ℹ️ Known issues & limitations"):
++        st.write("""
++        - Local songs will not play on devices that don’t have them downloaded.
++        - Tracks might appear playable but fail due to regional restrictions or removed content.
++        - Playback errors will attempt to skip the track automatically, but fails often
++        - Due to Spotify API limits, device detection and playback control may vary by user device.
++        """)
++
+ # set up Spotify credentials and scope
+ scope = ("user-library-read user-read-playback-state user-read-currently-playing "
+          "playlist-read-private user-modify-playback-state")
+ 
++
+ def authenticate_user():
+ 
+-    # ⚠️ Fallback to 'public' if user_id not yet fetched
++    # ⚠️ Use 'public' as fallback before login
+     user_id = st.session_state.get("user_id", "public")
+ 
+-    # 🔐 Optional: Hash the user ID to obscure it in filenames
++    # 🔐 Hash user ID for cache filename privacy
+     hashed_id = hashlib.sha256(user_id.encode()).hexdigest()
+     user_cache = f".cache-{hashed_id}"
+ 
+-    # 🎯 Create the auth manager with per-user cache file
++    # 🎯 Create auth manager with per-user cache file
+     auth_manager = SpotifyOAuth(
+         client_id=st.secrets['SPOTIPY_CLIENT_ID'],
+         client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
+@@ -46,29 +56,30 @@
+         show_dialog=True
+     )
+ 
+-    # 🧠 Try to load a cached token first
++    # 🧠 Try to get cached token for this user
+     token_info = auth_manager.get_cached_token()
+ 
+     if not token_info:
+-        # 🔍 Check for auth code in URL query params
++        # 🔍 Check for Spotify auth code in URL query params
+         code = st.query_params.get("code")
+ 
+         if not code:
+-            # 🚪 No code or token = show login button
++            # 🚪 No cached token or code, prompt login
+             auth_url = auth_manager.get_authorize_url()
+             st.link_button("🎧 Login with Spotify", auth_url)
+             st.stop()
+         else:
+             try:
+-                # 🔁 Exchange the code for a token
++                # 🔁 Exchange code for token (automatically cached)
+                 auth_manager.get_access_token(code)
+                 st.query_params.clear()
+ 
+-                # 👤 Fetch and store the user ID in session_state
+-                user_profile = spotipy.Spotify(auth_manager=auth_manager).current_user()
++                # 👤 Fetch logged-in user's Spotify ID
++                sp_temp = spotipy.Spotify(auth_manager=auth_manager)
++                user_profile = sp_temp.current_user()
+                 st.session_state.user_id = user_profile["id"]
+ 
+-                # 💾 Update user_cache with real user ID after auth
++                # 💾 Recalculate and store hashed cache file path for this user
+                 hashed_id = hashlib.sha256(user_profile["id"].encode()).hexdigest()
+                 st.session_state.user_cache = f".cache-{hashed_id}"
+ 
+@@ -77,7 +88,7 @@
+                 st.query_params.clear()
+                 st.stop()
+ 
+-    # 🎵 Return authenticated Spotify client
++    # 🎵 Return authenticated Spotify client instance
+     try:
+         return spotipy.Spotify(auth_manager=auth_manager)
+     except Exception as e:
+@@ -194,7 +205,7 @@
+                 # update progress bar as track plays
+                 progress_bar.progress((second + 1) / SECONDS)  # fraction from 0 to 1
+ 
+-                # ff playback paused from device, wait until resumed
++                # if playback paused from device, wait until resumed
+                 if playback and not playback['is_playing']:
+                     while not sp.current_playback()['is_playing']:
+                         if not st.session_state.ph_running:
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"b3eef155-209e-407f-ae42-75cbc2ceffbd\" name=\"Changes\" comment=\"\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/app.py\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/app.py\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\">{\r\n  &quot;lastFilter&quot;: {\r\n    &quot;state&quot;: &quot;OPEN&quot;,\r\n    &quot;assignee&quot;: &quot;carlvalianti&quot;\r\n  }\r\n}</component>\r\n  <component name=\"GithubPullRequestsUISettings\">{\r\n  &quot;selectedUrlAndAccountId&quot;: {\r\n    &quot;url&quot;: &quot;https://github.com/carlvalianti/shotify_app.git&quot;,\r\n    &quot;accountId&quot;: &quot;14d0245a-44f2-4d59-bcb2-66310ff0f879&quot;\r\n  }\r\n}</component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 6\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"2znjeDOouIqYkeaZSNTBAGRJvhO\" />\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\">{\r\n  &quot;keyToString&quot;: {\r\n    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,\r\n    &quot;Python.app.executor&quot;: &quot;Run&quot;,\r\n    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,\r\n    &quot;git-widget-placeholder&quot;: &quot;main&quot;,\r\n    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,\r\n    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,\r\n    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;\r\n  }\r\n}</component>\r\n  <component name=\"SharedIndexes\">\r\n    <attachedChunks>\r\n      <set>\r\n        <option value=\"bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-PY-251.26927.90\" />\r\n        <option value=\"bundled-python-sdk-41e8cd69c857-64d779b69b7a-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-251.26927.90\" />\r\n      </set>\r\n    </attachedChunks>\r\n  </component>\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"b3eef155-209e-407f-ae42-75cbc2ceffbd\" name=\"Changes\" comment=\"\" />\r\n      <created>1752373823538</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1752373823538</updated>\r\n      <workItem from=\"1752373824595\" duration=\"9351000\" />\r\n      <workItem from=\"1752424352293\" duration=\"3033000\" />\r\n      <workItem from=\"1752437189785\" duration=\"2811000\" />\r\n      <workItem from=\"1752440032089\" duration=\"3221000\" />\r\n      <workItem from=\"1752448152766\" duration=\"26150000\" />\r\n    </task>\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"Vcs.Log.Tabs.Properties\">\r\n    <option name=\"TAB_STATES\">\r\n      <map>\r\n        <entry key=\"MAIN\">\r\n          <value>\r\n            <State />\r\n          </value>\r\n        </entry>\r\n      </map>\r\n    </option>\r\n  </component>\r\n  <component name=\"com.intellij.coverage.CoverageDataManagerImpl\">\r\n    <SUITE FILE_PATH=\"coverage/shotify_app$app.coverage\" NAME=\"app Coverage Results\" MODIFIED=\"1752450938358\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$\" />\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision 998f5bf2b2e79de8d60abfb69addda02aca0c83f)
++++ b/.idea/workspace.xml	(date 1752789837290)
+@@ -5,6 +5,8 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="b3eef155-209e-407f-ae42-75cbc2ceffbd" name="Changes" comment="">
++      <change beforePath="$PROJECT_DIR$/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7" beforeDir="false" afterPath="$PROJECT_DIR$/.cache-efa1f375d76194fa51a3556a97e641e61685f914d446979da50a551a4333ffd7" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+     </list>
+@@ -72,7 +74,7 @@
+       <workItem from="1752424352293" duration="3033000" />
+       <workItem from="1752437189785" duration="2811000" />
+       <workItem from="1752440032089" duration="3221000" />
+-      <workItem from="1752448152766" duration="26150000" />
++      <workItem from="1752448152766" duration="30800000" />
+     </task>
+     <servers />
+   </component>
+@@ -91,6 +93,6 @@
+     </option>
+   </component>
+   <component name="com.intellij.coverage.CoverageDataManagerImpl">
+-    <SUITE FILE_PATH="coverage/shotify_app$app.coverage" NAME="app Coverage Results" MODIFIED="1752450938358" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
++    <SUITE FILE_PATH="coverage/shotify_app$app.coverage" NAME="app Coverage Results" MODIFIED="1752722841649" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+   </component>
+ </project>
+\ No newline at end of file
+Index: .gitignore
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>.streamlit/secrets.toml\r\nlaunch.bat\r\n.cache-public
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.gitignore b/.gitignore
+--- a/.gitignore	(revision 998f5bf2b2e79de8d60abfb69addda02aca0c83f)
++++ b/.gitignore	(date 1752720185129)
+@@ -1,3 +1,3 @@
+ .streamlit/secrets.toml
+ launch.bat
+-.cache-public
+\ No newline at end of file
++.cache*
+\ No newline at end of file
