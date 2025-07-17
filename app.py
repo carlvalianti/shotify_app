@@ -1,3 +1,4 @@
+import hashlib
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -28,39 +29,55 @@ scope = ("user-library-read user-read-playback-state user-read-currently-playing
 
 def authenticate_user():
 
-    # create the auth manager with a cache file for public use
+    # ⚠️ Fallback to 'public' if user_id not yet fetched
+    user_id = st.session_state.get("user_id", "public")
+
+    # 🔐 Optional: Hash the user ID to obscure it in filenames
+    hashed_id = hashlib.sha256(user_id.encode()).hexdigest()
+    user_cache = f".cache-{hashed_id}"
+
+    # 🎯 Create the auth manager with per-user cache file
     auth_manager = SpotifyOAuth(
         client_id=st.secrets['SPOTIPY_CLIENT_ID'],
         client_secret=st.secrets['SPOTIPY_CLIENT_SECRET'],
         redirect_uri=st.secrets['SPOTIPY_REDIRECT_URI'],
         scope=scope,
-        cache_path=".cache-public",
+        cache_path=user_cache,
         show_dialog=True
     )
 
-    # check for cached token first
+    # 🧠 Try to load a cached token first
     token_info = auth_manager.get_cached_token()
 
-    # ff no cached token, check for code in query params
     if not token_info:
+        # 🔍 Check for auth code in URL query params
         code = st.query_params.get("code")
 
         if not code:
-            # No token and no code = show login button
+            # 🚪 No code or token = show login button
             auth_url = auth_manager.get_authorize_url()
             st.link_button("🎧 Login with Spotify", auth_url)
             st.stop()
         else:
             try:
-                # exchange the code for a token (let Spotipy manage format)
+                # 🔁 Exchange the code for a token
                 auth_manager.get_access_token(code)
-                st.query_params.clear()  # Clear URL params once used
+                st.query_params.clear()
+
+                # 👤 Fetch and store the user ID in session_state
+                user_profile = spotipy.Spotify(auth_manager=auth_manager).current_user()
+                st.session_state.user_id = user_profile["id"]
+
+                # 💾 Update user_cache with real user ID after auth
+                hashed_id = hashlib.sha256(user_profile["id"].encode()).hexdigest()
+                st.session_state.user_cache = f".cache-{hashed_id}"
+
             except Exception as e:
                 st.error(f"🚫 Spotify token exchange failed: {e}")
                 st.query_params.clear()
                 st.stop()
 
-    # try using the token (either from cache or fresh)
+    # 🎵 Return authenticated Spotify client
     try:
         return spotipy.Spotify(auth_manager=auth_manager)
     except Exception as e:
